@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отчёт по заказу дизайна — {{ client_name }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        body {
+            font-family: 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #333;
+            max-width: 100%;
+        }
+        .report-header {
+            background-color: #1e3a5f;
+            color: #fff;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            width: 100%;
+        }
+        .report-header-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .report-header-icon-cell {
+            width: 48px;
+            vertical-align: middle;
+            padding-right: 16px;
+        }
+        .report-header-icon-cell svg {
+            width: 40px;
+            height: 40px;
+        }
+        .report-header-content-cell {
+            vertical-align: middle;
+        }
+        .report-header h1 {
+            margin: 0;
+            padding-top: 2px;
+            font-size: 18pt;
+            font-weight: 600;
+        }
+        .report-header .report-datetime {
+            margin-top: 4px;
+            font-size: 9pt;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .report-section {
+            margin-bottom: 18px;
+        }
+        .report-section h2 {
+            font-size: 10pt;
+            color: #1e3a5f;
+            margin: 0 0 4px 0;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        .report-section p {
+            margin: 0;
+            color: #444;
+        }
+        .design-image-container {
+            width: 100%;
+            margin-top: 8px;
+        }
+        .design-image-container img {
+            width: 100%;
+            max-width: 16cm;
+            height: auto;
+            border: 1px solid #e2e8f0;
+        }
+        .client-name-block {
+            font-size: 12pt;
+            font-weight: 600;
+            color: #1e3a5f;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .footer {
+            margin-top: 32px;
+            padding-top: 10px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 9pt;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <table class="report-header-table">
+            <tr>
+                <td class="report-header-icon-cell">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path fill="#ffffff" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm0 2l5 5h-5V4zM8 13h8v1H8v-1zm0 3h8v1H8v-1zm0-6h5v1H8v-1z"/>
+                    </svg>
+                </td>
+                <td class="report-header-content-cell">
+                    <h1>Отчёт по заказу дизайна сайта</h1>
+                    <div class="report-datetime">{{ report_datetime }}</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="client-name-block">Клиент: {{ client_name }}</div>
+
+    <div class="report-section">
+        <h2>Тема заказа</h2>
+        <p>{{ topic }}</p>
+    </div>
+
+    <div class="report-section">
+        <h2>Основной запрос</h2>
+        <p>{{ main_request }}</p>
+    </div>
+
+    <div class="report-section">
+        <h2>Желаемые сроки и стоимость</h2>
+        <p><strong>Сроки:</strong> {{ desired_deadline }}</p>
+        <p><strong>Стоимость/бюджет:</strong> {{ desired_cost }}</p>
+    </div>
+
+    <div class="report-section">
+        <h2>Основные пожелания к продукту</h2>
+        <p>{{ main_wishes }}</p>
+    </div>
+
+    <div class="report-section">
+        <h2>Пример дизайна сайта</h2>
+        <div class="design-image-container">
+            <img src="data:image/png;base64,{{ design_image_base64 }}" alt="Пример дизайна сайта" />
+        </div>
+    </div>
+
+    <div class="report-section">
+        <h2>Рекомендуемые следующие шаги</h2>
+        <p>{{ next_steps }}</p>
+    </div>
+
+    <div class="footer">
+        Сформировано автоматически. AI Client Report Generator.
+    </div>
+</body>
+</html>
