@@ -1,41 +1,43 @@
 """Модуль извлечения текста из файлов разных форматов."""
 
+import logging
 from pathlib import Path
 
 from pypdf import PdfReader
+
+from utils.input_validator import validate_file_path
+
+logger = logging.getLogger(__name__)
 
 
 def extract_text_from_file(filepath: str) -> str:
     """
     Извлекает текст из файла (txt, docx, pdf).
-    
+
     Args:
         filepath: Путь к файлу.
-        
+
     Returns:
         Извлечённый текст.
-        
+
     Raises:
-        ValueError: Если формат не поддерживается или файл не найден.
+        FileNotFoundError: Файл не найден.
+        UnsupportedFormatError: Формат не поддерживается.
+        EmptyInputError: Путь пустой.
     """
-    path = Path(filepath)
-    
-    if not path.exists():
-        raise FileNotFoundError(f"Файл не найден: {filepath}")
-    
+    path = validate_file_path(filepath)
     suffix = path.suffix.lower()
+    logger.info("Извлечение текста из файла: %s (формат: %s)", filepath, suffix)
     
     if suffix == ".txt":
-        return path.read_text(encoding="utf-8", errors="replace")
+        text = path.read_text(encoding="utf-8", errors="replace")
     elif suffix == ".pdf":
-        return _extract_from_pdf(path)
-    elif suffix in (".docx", ".doc"):
-        return _extract_from_docx(path)
+        text = _extract_from_pdf(path)
     else:
-        raise ValueError(
-            f"Неподдерживаемый формат: {suffix}. "
-            "Используйте .txt, .pdf или .docx"
-        )
+        text = _extract_from_docx(path)
+
+    logger.info("Текст извлечён: %d символов", len(text))
+    return text
 
 
 def _extract_from_pdf(path: Path) -> str:

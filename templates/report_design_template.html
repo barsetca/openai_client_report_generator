@@ -65,13 +65,17 @@
             margin: 0;
             color: #444;
         }
+        .design-image-page {
+            page-break-before: always;
+        }
         .design-image-container {
             width: 100%;
-            margin-top: 8px;
         }
         .design-image-container img {
-            width: 100%;
-            max-width: 16cm;
+            display: block;
+            max-width: 17cm;
+            max-height: 24cm;
+            width: auto;
             height: auto;
             border: 1px solid #e2e8f0;
         }
@@ -134,9 +138,7 @@
 
     <div class="report-section">
         <h2>Пример дизайна сайта</h2>
-        <div class="design-image-container">
-            <img src="data:image/png;base64,{{ design_image_base64 }}" alt="Пример дизайна сайта" />
-        </div>
+        <p>См. изображение на следующей странице.</p>
     </div>
 
     <div class="report-section">
@@ -146,6 +148,10 @@
 
     <div class="footer">
         Сформировано автоматически. AI Client Report Generator.
+    </div>
+
+    <div class="design-image-page design-image-container">
+        <img src="data:image/png;base64,{{ design_image_base64 }}" alt="Пример дизайна сайта" />
     </div>
 </body>
 </html>

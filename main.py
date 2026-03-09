@@ -5,9 +5,22 @@ AI Client Report Generator — основной модуль.
 с использованием ИИ и HTML-шаблонов.
 """
 
+import logging
 import sys
 from pathlib import Path
 
+from utils.logger import setup_logging
+
+logger = logging.getLogger(__name__)
+
+from utils.input_validator import (
+    InputValidationError,
+    validate_file_path,
+    validate_transcription_text,
+    validate_product_name,
+    validate_product_price,
+    validate_product_file_lines,
+)
 from utils.ai_processor import (
     process_dialog_with_ai,
     extract_design_prompt,
@@ -70,27 +83,23 @@ def get_product_input() -> tuple[str, str]:
     print("Введите название товара и стоимость.")
     print("Варианты: путь к файлу (txt) или ввод с клавиатуры")
     print()
-    
+
     first_line = input("Название товара или путь к файлу: ").strip()
-    
-    # Проверяем, не путь ли к файлу
+
     if first_line:
-        path = Path(first_line.strip().strip('"').strip("'"))
-        if not path.is_absolute():
-            path = PROJECT_ROOT / path
-        if path.suffix.lower() == ".txt" and path.exists():
-            try:
-                lines = path.read_text(encoding="utf-8", errors="replace").strip().split("\n")
-                name = lines[0].strip() if lines else ""
-                price = lines[1].strip() if len(lines) > 1 else ""
-                if name:
-                    return name, price
-            except Exception as e:
-                print(f"Ошибка чтения: {e}")
-    
+        raw_path = first_line.strip().strip('"').strip("'")
+        try:
+            path = validate_file_path(raw_path, allowed_formats=(".txt",), base_path=PROJECT_ROOT)
+            lines = path.read_text(encoding="utf-8", errors="replace").strip().split("\n")
+            return validate_product_file_lines(lines)
+        except InputValidationError as e:
+            print(f"Ошибка: {e}")
+        except (OSError, UnicodeDecodeError) as e:
+            print(f"Ошибка чтения файла: {e}")
+
     name = first_line or input("Название товара: ").strip()
     price = input("Стоимость: ").strip()
-    return name, price
+    return validate_product_name(name), validate_product_price(price)
 
 
 def get_text_or_file() -> str:
@@ -102,21 +111,21 @@ def get_text_or_file() -> str:
     print("Введите текст транскрибации или путь к файлу (txt, pdf, docx):")
     print("(Для текста: вставьте и нажмите Ctrl+D / Ctrl+Z+Enter)")
     print()
-    
+
     first_line = input().strip()
-    
-    # Проверяем, не путь ли к файлу
+
     if first_line:
-        path = Path(first_line.strip().strip('"').strip("'"))
-        if not path.is_absolute():
-            path = PROJECT_ROOT / path
-        if path.suffix.lower() in (".txt", ".pdf", ".docx") and path.exists():
-            try:
-                return extract_text_from_file(str(path))
-            except Exception as e:
-                print(f"Ошибка чтения файла: {e}")
-                print("Трактуем ввод как текст.")
-    
+        raw_path = first_line.strip().strip('"').strip("'")
+        try:
+            path = validate_file_path(raw_path, base_path=PROJECT_ROOT)
+            return extract_text_from_file(str(path))
+        except InputValidationError as e:
+            print(f"Ошибка: {e}")
+            print("Трактуем ввод как текст.")
+        except (OSError, UnicodeDecodeError) as e:
+            print(f"Ошибка чтения файла: {e}")
+            print("Трактуем ввод как текст.")
+
     # Собираем текст до EOF (Ctrl+D / Ctrl+Z)
     lines = [first_line] if first_line else []
     while True:
@@ -125,19 +134,20 @@ def get_text_or_file() -> str:
         except EOFError:
             break
         lines.append(line)
-    
-    text = "\n".join(lines).strip()
-    return text
+
+    return "\n".join(lines).strip()
 
 
 def create_dialog_report(text: str) -> str:
     """Создаёт отчёт по диалогу."""
+    logger.info("Создание отчёта по диалогу (текст: %d символов)", len(text))
     data = process_dialog_with_ai(text)
     return generate_pdf_report(data)
 
 
 def create_design_report(text: str) -> str:
     """Создаёт отчёт по заказу дизайна с примером изображения."""
+    logger.info("Создание отчёта по дизайну (текст: %d символов)", len(text))
     data = process_dialog_with_ai(text)
     prompt = extract_design_prompt(text)
     image_bytes = generate_design_image(prompt)
@@ -146,6 +156,7 @@ def create_design_report(text: str) -> str:
 
 def create_product_card_report(product_name: str, product_price: str) -> str:
     """Создаёт карточку товара для маркетплейса."""
+    logger.info("Создание карточки товара: %s, цена: %s", product_name, product_price)
     card_data = get_product_card_data(product_name)
     image_bytes = generate_product_image(card_data["image_prompt"])
     return generate_pdf_product_card(
@@ -159,29 +170,32 @@ def create_product_card_report(product_name: str, product_price: str) -> str:
 def run_cli_noninteractive(filepath: str, report_type: str):
     """Запуск с аргументами командной строки (для скриптов)."""
     _, report_name = REPORT_TYPES[report_type]
-    
+
+    # Разрешаем относительные пути относительно корня проекта
+    resolved = Path(filepath)
+    if not resolved.is_absolute():
+        resolved = PROJECT_ROOT / resolved
+    filepath = str(resolved)
+
     try:
         if report_type == "3":
-            # Файл: первая строка — название, вторая — цена
-            lines = Path(filepath).read_text(encoding="utf-8", errors="replace").strip().split("\n")
-            product_name = lines[0].strip() if lines else ""
-            product_price = lines[1].strip() if len(lines) > 1 else ""
-            if not product_name:
-                print("Ошибка: укажите название товара в первой строке файла")
-                sys.exit(1)
+            path = validate_file_path(filepath, allowed_formats=(".txt",))
+            lines = path.read_text(encoding="utf-8", errors="replace").strip().split("\n")
+            product_name, product_price = validate_product_file_lines(lines)
             pdf_path = create_product_card_report(product_name, product_price)
         else:
             text = extract_text_from_file(filepath)
-            if not text.strip():
-                print("Ошибка: текст не может быть пустым")
-                sys.exit(1)
+            text = validate_transcription_text(text)
             if report_type == "1":
                 pdf_path = create_dialog_report(text)
             else:
                 pdf_path = create_design_report(text)
-        
+
         rel_path = Path(pdf_path).relative_to(PROJECT_ROOT)
         print(f"{report_name} успешно создан: {rel_path}")
+    except InputValidationError as e:
+        print(f"Ошибка входных данных: {e}")
+        sys.exit(1)
     except Exception as e:
         print(f"Ошибка: {e}")
         sys.exit(1)
@@ -196,29 +210,31 @@ def run_cli():
         if report_type not in REPORT_TYPES:
             print(f"Неизвестный тип отчёта: {report_type}. Допустимо: 1, 2, 3")
             sys.exit(1)
+        if not filepath or not str(filepath).strip():
+            print("Ошибка входных данных: путь к файлу не указан")
+            sys.exit(1)
         run_cli_noninteractive(filepath, report_type)
         return
     
     show_intro()
     report_type = get_report_type()
-    
-    if report_type == "3":
-        product_name, product_price = get_product_input()
-        if not product_name.strip():
-            print("Ошибка: название товара не может быть пустым.")
-            sys.exit(1)
-        text = None
-    else:
-        text = get_text_or_file()
-        if not text.strip():
-            print("Ошибка: текст не может быть пустым.")
-            sys.exit(1)
-        product_name, product_price = None, None
-    
+
+    try:
+        if report_type == "3":
+            product_name, product_price = get_product_input()
+            text = None
+        else:
+            text = get_text_or_file()
+            text = validate_transcription_text(text)
+            product_name, product_price = None, None
+    except InputValidationError as e:
+        print(f"Ошибка входных данных: {e}")
+        sys.exit(1)
+
     _, report_name = REPORT_TYPES[report_type]
     print()
     print("Обработка...")
-    
+
     try:
         if report_type == "1":
             pdf_path = create_dialog_report(text)
@@ -236,4 +252,5 @@ def run_cli():
 
 
 if __name__ == "__main__":
+    setup_logging()
     run_cli()

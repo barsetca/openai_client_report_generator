@@ -1,7 +1,10 @@
 """Модуль генерации PDF из HTML-шаблона через Jinja2 и WeasyPrint."""
 
 import base64
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
@@ -50,9 +53,10 @@ def generate_pdf_report(data: dict) -> str:
     filename = f"report_{timestamp}.pdf"
     output_path = REPORTS_DIR / filename
     
+    logger.info("Генерация PDF отчёта по диалогу")
     html_doc = HTML(string=html_content, base_url=str(TEMPLATES_DIR))
     html_doc.write_pdf(str(output_path))
-    
+    logger.info("PDF сохранён: %s", output_path)
     return str(output_path)
 
 
@@ -82,9 +86,10 @@ def generate_pdf_design_report(data: dict, design_image_bytes: bytes) -> str:
     filename = f"report_design_{timestamp}.pdf"
     output_path = REPORTS_DIR / filename
     
+    logger.info("Генерация PDF отчёта по дизайну (изображение: %d байт)", len(design_image_bytes))
     html_doc = HTML(string=html_content, base_url=str(TEMPLATES_DIR))
     html_doc.write_pdf(str(output_path))
-    
+    logger.info("PDF отчёта по дизайну сохранён: %s", output_path)
     return str(output_path)
 
 
@@ -114,7 +119,8 @@ def generate_pdf_product_card(
     filename = f"product_card_{timestamp}.pdf"
     output_path = REPORTS_DIR / filename
     
+    logger.info("Генерация PDF карточки товара: %s", product_name)
     html_doc = HTML(string=html_content, base_url=str(TEMPLATES_DIR))
     html_doc.write_pdf(str(output_path))
-    
+    logger.info("PDF карточки сохранён: %s", output_path)
     return str(output_path)

@@ -8,6 +8,7 @@ Telegram-бот AI Client Report Generator.
 """
 
 import asyncio
+import logging
 import tempfile
 from pathlib import Path
 
@@ -34,7 +35,9 @@ from main import (
     create_product_card_report,
 )
 from utils.text_extractor import extract_text_from_file
+from utils.logger import setup_logging
 
+logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent
 
 
@@ -115,6 +118,7 @@ async def main_callback(callback: CallbackQuery, state: FSMContext):
     data = callback.data
     
     if data == "cancel":
+        logger.info("Пользователь %s отменил операцию", callback.from_user.id)
         await state.clear()
         await callback.message.edit_text(
             WELCOME,
@@ -126,6 +130,7 @@ async def main_callback(callback: CallbackQuery, state: FSMContext):
     
     if data.startswith("report_"):
         report_type = data.split("_")[1]
+        logger.info("Пользователь %s выбрал отчёт типа %s", callback.from_user.id, report_type)
         await state.update_data(report_type=report_type)
         
         prompt = REPORT_PROMPTS.get(report_type, "")
@@ -155,6 +160,7 @@ async def transcription_handler(message: Message, state: FSMContext):
         return
     
     status_msg = await message.answer("⏳ Обработка...")
+    logger.info("Обработка транскрибации (тип %s, %d символов) от %s", report_type, len(text), message.from_user.id)
     
     try:
         if report_type == "1":
@@ -194,6 +200,7 @@ async def document_handler(message: Message, state: FSMContext):
     report_type = data.get("report_type", "1")
     
     status_msg = await message.answer("⏳ Скачиваю и обрабатываю файл...")
+    logger.info("Обработка файла %s (тип %s) от %s", doc.file_name, report_type, message.from_user.id)
     
     try:
         bot = message.bot
@@ -270,6 +277,7 @@ async def product_price_handler(message: Message, state: FSMContext):
         return
     
     status_msg = await message.answer("⏳ Генерирую карточку товара...")
+    logger.info("Генерация карточки товара '%s' от %s", product_name, message.from_user.id)
     
     try:
         pdf_path = await run_sync(create_product_card_report, product_name, price)
@@ -341,8 +349,10 @@ async def main():
 
 if __name__ == "__main__":
     import os
+    setup_logging()
     if not os.getenv("TELEGRAM_BOT_TOKEN"):
-        print("Ошибка: укажите TELEGRAM_BOT_TOKEN в .env")
+        logger.error("TELEGRAM_BOT_TOKEN не задан в .env")
         exit(1)
     
+    logger.info("Запуск Telegram-бота")
     asyncio.run(main())

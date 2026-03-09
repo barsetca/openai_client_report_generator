@@ -1,0 +1,9 @@
+version: "3.8"
+services:
+  report-bot:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    volumes:
+      - ./reports:/app/reports
+      - ./temp:/app/temp

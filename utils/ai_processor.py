@@ -1,9 +1,13 @@
 """Модуль взаимодействия с OpenAI для обработки диалогов с клиентами."""
 
 import json
+import logging
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 from openai import OpenAI
 
 load_dotenv()
@@ -44,6 +48,7 @@ def process_dialog_with_ai(text: str) -> dict:
     if not text or not text.strip():
         raise ValueError("Текст транскрибации не может быть пустым")
     
+    logger.info("Анализ диалога через OpenAI (модель: %s)", OPENAI_MODEL)
     client = OpenAI(api_key=OPENAI_API_KEY)
     
     response = client.chat.completions.create(
@@ -66,12 +71,16 @@ def process_dialog_with_ai(text: str) -> dict:
         )
     
     try:
-        return json.loads(content)
+        result = json.loads(content)
+        logger.info("Диалог успешно проанализирован, client_name=%s", result.get("client_name", "?"))
+        return result
     except json.JSONDecodeError as e:
+        logger.error("Невалидный JSON от OpenAI: %s", e)
         raise ValueError(f"OpenAI вернул невалидный JSON: {e}") from e
 
 
 OPENAI_IMAGE_MODEL = os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1-mini")
+SAVE_DESIGN_IMAGES_TO_TEMP = os.getenv("SAVE_DESIGN_IMAGES_TO_TEMP", "false").lower() in ("true", "1", "yes")
 
 DESIGN_PROMPT_SYSTEM = """Ты — ассистент для создания промптов к генератору изображений.
 На основе транскрибации диалога о заказе дизайна сайта создай детальный промпт на английском языке для генерации примера изображения макета/дизайна веб-сайта.
@@ -82,16 +91,19 @@ DESIGN_PROMPT_SYSTEM = """Ты — ассистент для создания п
 def extract_design_prompt(text: str) -> str:
     """
     Извлекает промпт для генерации изображения дизайна из транскрибации.
-    
+
     Args:
         text: Текст транскрибации о заказе дизайна сайта.
-        
+
     Returns:
         Промпт для DALL-E.
     """
+    if not text or not text.strip():
+        raise ValueError("Текст транскрибации не может быть пустым")
     if not OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY не задан в .env файле")
     
+    logger.info("Извлечение промпта для дизайна через OpenAI")
     client = OpenAI(api_key=OPENAI_API_KEY)
     
     response = client.chat.completions.create(
@@ -103,7 +115,9 @@ def extract_design_prompt(text: str) -> str:
         temperature=0.5,
     )
     
-    return response.choices[0].message.content.strip()
+    prompt_text = response.choices[0].message.content.strip()
+    logger.info("Промпт для дизайна получен (длина: %d символов)", len(prompt_text))
+    return prompt_text
 
 
 def generate_design_image(prompt: str) -> bytes:
@@ -147,8 +161,22 @@ def generate_design_image(prompt: str) -> bytes:
             "response_format": "b64_json",
         }
     
+    logger.info("Генерация изображения дизайна (модель: %s, size: %s)", OPENAI_IMAGE_MODEL, kwargs.get("size", "?"))
+    logger.info("Запрос на создание дизайна сайта для модели:\n---\n%s\n---", prompt)
     response = client.images.generate(**kwargs)
-    return base64.b64decode(response.data[0].b64_json)
+    img_bytes = base64.b64decode(response.data[0].b64_json)
+    logger.info("Изображение дизайна получено (%d байт)", len(img_bytes))
+    
+    if SAVE_DESIGN_IMAGES_TO_TEMP:
+        from datetime import datetime
+        temp_dir = Path(__file__).resolve().parent.parent / "temp"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"design_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.png"
+        temp_path = temp_dir / filename
+        temp_path.write_bytes(img_bytes)
+        logger.info("Изображение сохранено для диагностики: %s", temp_path)
+    
+    return img_bytes
 
 
 def generate_product_image(prompt: str) -> bytes:
@@ -182,8 +210,11 @@ def generate_product_image(prompt: str) -> bytes:
             "response_format": "b64_json",
         }
     
+    logger.info("Генерация изображения товара (модель: %s)", OPENAI_IMAGE_MODEL)
     response = client.images.generate(**kwargs)
-    return base64.b64decode(response.data[0].b64_json)
+    img_bytes = base64.b64decode(response.data[0].b64_json)
+    logger.info("Изображение товара получено (%d байт)", len(img_bytes))
+    return img_bytes
 
 
 PRODUCT_CARD_SYSTEM = """Ты — ассистент для создания карточек товаров маркетплейса.
@@ -208,6 +239,7 @@ def get_product_card_data(product_name: str) -> dict:
     if not OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY не задан в .env файле")
     
+    logger.info("Получение данных карточки товара: %s", product_name)
     client = OpenAI(api_key=OPENAI_API_KEY)
     
     response = client.chat.completions.create(
@@ -228,6 +260,9 @@ def get_product_card_data(product_name: str) -> dict:
         )
     
     try:
-        return json.loads(content)
+        result = json.loads(content)
+        logger.info("Данные карточки товара получены")
+        return result
     except json.JSONDecodeError as e:
+        logger.error("Невалидный JSON для карточки товара: %s", e)
         raise ValueError(f"OpenAI вернул невалидный JSON: {e}") from e

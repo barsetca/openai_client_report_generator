@@ -1,0 +1,17 @@
+FROM python:3.11-slim
+
+# Системные зависимости для WeasyPrint (PDF)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf2.0-0 \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+
+# По умолчанию — Telegram-бот
+CMD ["python3", "tg_bot.py"]
